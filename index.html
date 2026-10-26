@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tetris</title>
+<style>
+  :root { --cell: min(4.2vh, 4.2vw, 30px); }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         font-family:system-ui,Arial,sans-serif; background:#111827; color:#f9fafb; }
+  body.light { background:#f3f4f6; color:#111827; }
+  .screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+            background:#111827; z-index:20; }
+  body.light .screen { background:#f3f4f6; }
+  .screen[hidden] { display:none; }
+  .home-card,.settings-card { width:min(360px,90vw); text-align:center; background:#1f2937;
+             padding:32px; border-radius:18px; box-shadow:0 18px 50px #0008; }
+  body.light .home-card, body.light .settings-card { background:#fff; box-shadow:0 12px 35px #0002; }
+  .home-card h1 { font-size:48px; margin:0 0 5px; }
+  .home-card p { color:#9ca3af; margin:0 0 25px; }
+  .home-card button,.settings-card button { display:block; width:100%; margin:10px 0; }
+  .secondary { background:#4b5563; color:white; }
+  .settings-card { text-align:left; }
+  .settings-card h1 { margin-top:0; }
+  .settings-card label { display:flex; flex-direction:column; gap:7px; margin:18px 0; }
+  .settings-card input { width:100%; }
+  .theme-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; align-items:center; margin:20px 0; }
+  .theme-row button { margin:0; }
+  .mode-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; align-items:center; margin:20px 0; }
+  .mode-row button { margin:0; }
+  body.light .secondary { background:#d1d5db; color:#111827; }
+  .wrap { display:flex; gap:22px; align-items:flex-start; padding:20px; }
+  .game-area { position:relative; }
+  .board { display:grid; grid-template-columns:repeat(10,var(--cell)); grid-template-rows:repeat(20,var(--cell));
+           background:#0b1020; border:4px solid #374151; box-shadow:0 15px 45px #0008; }
+  .game-over { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+               background:#0009; border-radius:4px; }
+  .game-over[hidden] { display:none; }
+  .game-over-box { text-align:center; background:#1f2937; border:2px solid #4b5563;
+                   border-radius:16px; padding:24px; box-shadow:0 10px 30px #000b; }
+  .game-over-box h2 { margin:0 0 8px; font-size:30px; }
+  .game-over-box p { margin:8px 0 18px; }
+  .cell { width:var(--cell); height:var(--cell); border:1px solid #1f2937; }
+  .side { width:190px; display:flex; flex-direction:column; gap:12px; }
+  .panel { background:#1f2937; border-radius:12px; padding:14px; }
+  h1 { margin:0 0 8px; font-size:28px; }
+  .stat { display:flex; justify-content:space-between; margin:6px 0; }
+  .preview { display:grid; grid-template-columns:repeat(4,20px); grid-template-rows:repeat(4,20px);
+             justify-content:center; margin-top:8px; }
+  .preview div { width:20px;height:20px; }
+  button { border:0; border-radius:9px; padding:10px 12px; font-weight:700; cursor:pointer; }
+  .controls { font-size:13px; line-height:1.65; color:#d1d5db; }
+  .mobile { display:none; }
+  .game-over {
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.72); z-index:10;
+  }
+  .game-over.show { display:flex; }
+  .game-over-card {
+    background:#1f2937; border:3px solid #4b5563; border-radius:18px;
+    padding:30px; text-align:center; min-width:280px; box-shadow:0 20px 60px #000b;
+  }
+  .game-over-card h2 { font-size:38px; margin:0 0 8px; }
+  .game-over-card p { margin:8px 0 20px; color:#d1d5db; }
+  .game-over-card button { font-size:17px; width:100%; }
+  @media(max-width:700px) {
+    .wrap { gap:10px; padding:8px; }
+    .side { width:130px; }
+    .mobile { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .mobile button { padding:12px 4px; }
+  }
+  .cyan{background:#22d3ee}.yellow{background:#facc15}.purple{background:#a855f7}
+  .green{background:#22c55e}.red{background:#ef4444}.blue{background:#3b82f6}.orange{background:#f97316}
+  .ghost{opacity:.22}
+</style>
+</head>
+<body>
+<div id="homeScreen" class="screen">
+  <div class="home-card">
+    <h1>TETRIS</h1>
+    <p>Classic block-stacking game</p>
+    <div class="mode-row">
+      <span>Mode</span>
+      <button id="normalMode">Normal</button>
+      <button id="hardMode" class="secondary">Hard</button>
+    </div>
+    <button id="homePlay">Play</button>
+    <button id="homeSettings" class="secondary">Settings</button>
+  </div>
+</div>
+
+<div id="settingsScreen" class="screen" hidden>
+  <div class="settings-card">
+    <h1>Settings</h1>
+    <label>Sound <input id="soundVolume" type="range" min="0" max="100" value="70"></label>
+    <label>Music <input id="musicVolume" type="range" min="0" max="100" value="40"></label>
+    <div class="theme-row">
+      <span>Theme</span>
+      <button id="darkMode">Dark</button>
+      <button id="lightMode">Light</button>
+    </div>
+    <button id="settingsBack" class="secondary">Back</button>
+  </div>
+</div>
+
+<div id="gameScreen" hidden>
+<div class="wrap">
+  <div class="game-area">
+    <div id="board" class="board" aria-label="Tetris board"></div>
+    <div id="gameOver" class="game-over" hidden>
+      <div class="game-over-box">
+        <h2>GAME OVER</h2>
+        <p>Final Score: <b id="finalScore">0</b></p>
+        <button id="playAgain">Play Again</button>
+      </div>
+    </div>
+    <div class="mobile">
+      <button data-key="ArrowLeft">←</button>
+      <button data-key="ArrowUp">↻</button>
+      <button data-key="ArrowRight">→</button>
+      <button data-key="ArrowDown">↓</button>
+      <button data-key="Space">DROP</button>
+      <button data-key="KeyC">HOLD</button>
+    </div>
+  </div>
+  <aside class="side">
+    <div class="panel">
+      <h1>TETRIS</h1>
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat"><span>Level</span><b id="level">1</b></div>
+      <div class="stat"><span>Lines</span><b id="lines">0</b></div>
+    </div>
+    <div class="panel">
+      <b>Next</b><div id="next" class="preview"></div>
+    </div>
+    <div class="panel">
+      <b>Hold</b><div id="hold" class="preview"></div>
+    </div>
+    <div class="panel">
+      <button id="start" style="width:100%">Start / Restart</button>
+      <button id="pause" style="width:100%;margin-top:8px">Pause</button>
+      <button id="menu" class="secondary" style="width:100%;margin-top:8px">Back to Menu</button>
+    </div>
+    <div class="panel controls">
+      <b>Controls</b><br>
+      ← → Move<br>↓ Soft drop<br>↑ Rotate<br>Space Hard drop<br>C Hold<br>P Pause
+    </div>
+  </aside>
+</div>
+<div id="gameOver" class="game-over">
+  <div class="game-over-card">
+    <h2>GAME OVER</h2>
+    <p>Final Score: <b id="finalScore">0</b></p>
+    <button id="playAgain">Play Again</button>
+  </div>
+</div>
+</div>
+<script>
+const W=10,H=20;
+const COLORS={I:'cyan',O:'yellow',T:'purple',S:'green',Z:'red',J:'blue',L:'orange'};
+let audioCtx=null, soundVolume=0.7, musicVolume=0.4;
+let musicTimer=null, musicStep=0;
+function beep(freq=440,duration=0.05){
+  if(soundVolume<=0)return;
+  audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.frequency.value=freq; g.gain.value=soundVolume*0.05;
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+duration);
+}
+
+function startMusic(){
+  if(musicVolume<=0) return;
+  audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  stopMusic();
+  musicStep=0;
+  const melody=[659,784,880,784,659,587,659,523,587,659,784,659,587,523,587,659];
+  const bass=[165,165,196,196,147,147,131,131];
+  const playNote=(freq,dur,vol,type='square')=>{
+    if(!audioCtx || musicVolume<=0) return;
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(0,audioCtx.currentTime);
+    g.gain.linearRampToValueAtTime(vol*musicVolume,audioCtx.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+dur+0.02);
+  };
+  musicTimer=setInterval(()=>{
+    const i=musicStep%melody.length;
+    playNote(melody[i],0.18,0.035,'square');
+    if(musicStep%2===0) playNote(bass[(musicStep/2)%bass.length],0.34,0.025,'triangle');
+    musicStep++;
+  },220);
+}
+function stopMusic(){
+  if(musicTimer){clearInterval(musicTimer);musicTimer=null;}
+}
+
+function setTheme(theme){
+  document.body.classList.toggle('light',theme==='light');
+  localStorage.setItem('tetrisTheme',theme);
+}
+const SHAPES={
+ I:[[1,1,1,1]], O:[[1,1],[1,1]],
+ T:[[0,1,0],[1,1,1]], S:[[0,1,1],[1,1,0]],
+ Z:[[1,1,0],[0,1,1]], J:[[1,0,0],[1,1,1]], L:[[0,0,1],[1,1,1]]
+};
+let board, current, nextQueue, hold, canHold, score, lines, level, running, paused, last, fallAcc, lockAcc;
+let gameMode = 'normal';
+let hardStartTime = 0;
+
+function emptyBoard(){ return Array.from({length:H},()=>Array(W).fill(null)); }
+function clone(m){ return m.map(r=>r.slice()); }
+function rotate(m){ const h=m.length,w=m[0].length,n=Array.from({length:w},()=>Array(h).fill(0)); for(let y=0;y<h;y++)for(let x=0;x<w;x++)n[x][h-1-y]=m[y][x]; return n; }
+function bag(){ const a=Object.keys(SHAPES); for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function refill(){ if(nextQueue.length<7) nextQueue.push(...bag()); }
+function spawn(type=nextQueue.shift()){
+ refill(); const shape=clone(SHAPES[type]); current={type,shape,x:Math.floor((W-shape[0].length)/2),y:0}; canHold=true; lockAcc=0;
+ if(collides(current.x,current.y,current.shape)){
+   running=false;
+   document.getElementById('finalScore').textContent=score;
+   document.getElementById('gameOver').classList.add('show');
+   draw();
+ }
+}
+function collides(x,y,shape){
+ for(let r=0;r<shape.length;r++)for(let c=0;c<shape[r].length;c++)if(shape[r][c]){
+   const bx=x+c,by=y+r; if(bx<0||bx>=W||by>=H)return true; if(by>=0&&board[by][bx])return true;
+ } return false;
+}
+function move(dx,dy){ if(!running||paused)return false; if(!collides(current.x+dx,current.y+dy,current.shape)){current.x+=dx;current.y+=dy;lockAcc=0;beep(260,0.025);return true;} return false; }
+function tryRotate(){
+ if(!running||paused)return;
+ const s=rotate(current.shape), kicks=[[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1],[0,-2]];
+ for(const [kx,ky] of kicks) if(!collides(current.x+kx,current.y+ky,s)){current.shape=s;current.x+=kx;current.y+=ky;lockAcc=0;beep(520,0.04);return;}
+}
+function lock(){
+ for(let r=0;r<current.shape.length;r++)for(let c=0;c<current.shape[r].length;c++)if(current.shape[r][c]){
+   const y=current.y+r;if(y>=0)board[y][current.x+c]=current.type;
+ }
+ clearLines(); spawn(); draw();
+}
+
+function showGameOver(){
+  stopMusic();
+  document.getElementById('finalScore').textContent=score;
+  document.getElementById('gameOver').hidden=false;
+  document.getElementById('pause').textContent='Pause';
+  draw();
+}
+
+function clearLines(){
+ let n=0; board=board.filter(row=>{if(row.every(Boolean)){n++;return false}return true;});
+ while(board.length<H)board.unshift(Array(W).fill(null));
+ if(n){ beep(700+n*120,0.12); const pts=[0,100,300,500,800][n]||0; score+=pts*level; lines+=n; level=1+Math.floor(lines/10); }
+}
+function hardDrop(){
+ if(!running||paused)return; let d=0; while(move(0,1))d++; score+=d*2; beep(180,0.06); lock();
+}
+function holdPiece(){
+ if(!running||paused||!canHold)return; canHold=false;
+ const t=current.type;
+ if(hold){ const h=hold; hold=t; spawn(h); } else { hold=t; spawn(); }
+ draw();
+}
+function ghostY(){ let y=current.y; while(!collides(current.x,y+1,current.shape))y++; return y; }
+function draw(){
+ const el=document.getElementById('board'); el.innerHTML='';
+ const cells=Array.from({length:H},()=>Array(W).fill(null));
+
+ // Draw locked blocks first.
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++)cells[y][x]=board[y][x]?{t:board[y][x],locked:true}:null;
+
+ // Draw ghost only on empty cells, so it can never hide a real block.
+ if(current){
+   const gy=ghostY();
+   for(let r=0;r<current.shape.length;r++)for(let c=0;c<current.shape[r].length;c++)if(current.shape[r][c]){
+     const x=current.x+c,y=gy+r;
+     if(y>=0&&y<H&&x>=0&&x<W&&!cells[y][x]) cells[y][x]={t:current.type,g:true};
+   }
+
+   // Draw active piece last.
+   for(let r=0;r<current.shape.length;r++)for(let c=0;c<current.shape[r].length;c++)if(current.shape[r][c]){
+     const x=current.x+c,y=current.y+r;
+     if(y>=0&&y<H&&x>=0&&x<W) cells[y][x]={t:current.type};
+   }
+ }
+
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+   const d=document.createElement('div'); d.className='cell';
+   const v=cells[y][x];
+   if(v){
+     d.classList.add(COLORS[v.t]);
+     if(v.g)d.classList.add('ghost');
+   }
+   el.appendChild(d);
+ }
+ document.getElementById('score').textContent=score;
+ document.getElementById('lines').textContent=lines;
+ document.getElementById('level').textContent=level;
+ preview('next',nextQueue[0]); preview('hold',hold);
+}
+function preview(id,type){
+ const el=document.getElementById(id);el.innerHTML='';
+ const m=type?SHAPES[type]:[];
+ for(let y=0;y<4;y++)for(let x=0;x<4;x++){
+   const d=document.createElement('div');
+   if(m[y]&&m[y][x])d.className=COLORS[type];
+   el.appendChild(d);
+ }
+}
+function goToMenu(){
+  stopMusic();
+  running=false;
+  paused=false;
+  document.getElementById('gameScreen').hidden=true;
+  document.getElementById('gameOver').hidden=true;
+  document.getElementById('homeScreen').hidden=false;
+}
+function startGame(){
+ document.getElementById('gameOver').classList.remove('show');
+ document.getElementById('pause').textContent='Pause';
+ board=emptyBoard();nextQueue=[];hold=null;canHold=true;score=0;lines=0;level=1;running=true;paused=false;fallAcc=0;lockAcc=0;
+ refill();spawn();last=performance.now();draw();requestAnimationFrame(loop);
+}
+function togglePause(){if(running){paused=!paused;document.getElementById('pause').textContent=paused?'Resume':'Pause';}}
+function loop(t){
+ if(!running)return;
+ const dt=Math.min(50,t-last);last=t;
+ if(!paused){
+   const interval=Math.max(60,800-Math.min(700,(level-1)*65));
+   fallAcc+=dt;
+   if(fallAcc>=interval){fallAcc=0;if(!move(0,1))lockAcc+=interval;}
+   if(!collides(current.x,current.y+1,current.shape))lockAcc=0;
+   else {lockAcc+=dt;if(lockAcc>=500)lock();}
+   draw();
+ }
+ requestAnimationFrame(loop);
+}
+document.addEventListener('keydown',e=>{
+ if(e.code==='KeyP'){togglePause();return}
+ if(!running)return;
+ if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp','Space','KeyC'].includes(e.code))e.preventDefault();
+ if(e.code==='ArrowLeft')move(-1,0);
+ if(e.code==='ArrowRight')move(1,0);
+ if(e.code==='ArrowDown'){if(move(0,1))score+=1;}
+ if(e.code==='ArrowUp')tryRotate();
+ if(e.code==='Space')hardDrop();
+ if(e.code==='KeyC')holdPiece();
+ draw();
+});
+document.querySelectorAll('.mobile button').forEach(b=>b.onclick=()=>{
+ const k=b.dataset.key;
+ if(k==='ArrowLeft')move(-1,0);else if(k==='ArrowRight')move(1,0);else if(k==='ArrowDown')move(0,1);
+ else if(k==='ArrowUp')tryRotate();else if(k==='Space')hardDrop();else if(k==='KeyC')holdPiece();draw();
+});
+document.getElementById('start').onclick=startGame;
+document.getElementById('playAgain').onclick=startGame;
+document.getElementById('pause').onclick=togglePause;
+document.getElementById('menu').onclick=goToMenu;
+
+const home=document.getElementById('homeScreen'), settings=document.getElementById('settingsScreen'), game=document.getElementById('gameScreen');
+document.getElementById('normalMode').onclick=()=>{
+  gameMode='normal';
+  localStorage.setItem('tetrisMode',gameMode);
+  document.getElementById('normalMode').classList.remove('secondary');
+  document.getElementById('hardMode').classList.add('secondary');
+};
+document.getElementById('hardMode').onclick=()=>{
+  gameMode='hard';
+  localStorage.setItem('tetrisMode',gameMode);
+  document.getElementById('hardMode').classList.remove('secondary');
+  document.getElementById('normalMode').classList.add('secondary');
+};
+document.getElementById('homePlay').onclick=()=>{home.hidden=true;settings.hidden=true;game.hidden=false;startGame();};
+document.getElementById('homeSettings').onclick=()=>{home.hidden=true;settings.hidden=false;};
+document.getElementById('settingsBack').onclick=()=>{settings.hidden=true;home.hidden=false;};
+document.getElementById('darkMode').onclick=()=>setTheme('dark');
+document.getElementById('lightMode').onclick=()=>setTheme('light');
+document.getElementById('soundVolume').oninput=e=>{soundVolume=e.target.value/100;localStorage.setItem('tetrisSound',soundVolume);};
+document.getElementById('musicVolume').oninput=e=>{
+  musicVolume=e.target.value/100;
+  localStorage.setItem('tetrisMusic',musicVolume);
+  if(musicVolume<=0) stopMusic();
+  else if(running) startMusic();
+};
+const savedTheme=localStorage.getItem('tetrisTheme')||'dark'; setTheme(savedTheme);
+gameMode=localStorage.getItem('tetrisMode')||'normal';
+document.getElementById('normalMode').classList.toggle('secondary',gameMode!=='normal');
+document.getElementById('hardMode').classList.toggle('secondary',gameMode!=='hard');
+soundVolume=Number(localStorage.getItem('tetrisSound')??0.7); musicVolume=Number(localStorage.getItem('tetrisMusic')??0.4);
+document.getElementById('soundVolume').value=soundVolume*100;
+document.getElementById('musicVolume').value=musicVolume*100;
+document.getElementById('playAgain').onclick=startGame;
+board=emptyBoard();nextQueue=[];refill();draw(); game.hidden=true;
+</script>
+</body>
+</html>
